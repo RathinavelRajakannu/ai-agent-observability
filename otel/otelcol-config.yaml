@@ -1,0 +1,127 @@
+# Replaces /otel-lgtm/otelcol-config.yaml from grafana/otel-lgtm:0.35.0.
+# Differences from upstream:
+#   - deltatocumulative processor on metrics: Claude Code and Grok Build export
+#     delta-temporality counters, which Prometheus' OTLP receiver rejects.
+#   - transform/agent: stamps a uniform `agent_name` attribute on every signal
+#     so dashboards can group by agent regardless of each CLI's service.name.
+#   - profiles pipeline removed (no agent emits profiles).
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+    path: "/ready"
+
+processors:
+  batch:
+  deltatocumulative:
+    max_stale: 24h
+  transform/agent:
+    error_mode: ignore
+    metric_statements: &agent_statements
+      - context: resource
+        statements:
+          - set(resource.attributes["agent_name"], resource.attributes["service.name"])
+          - set(resource.attributes["agent_name"], "claude-code") where IsMatch(resource.attributes["service.name"], "(?i)claude")
+          - set(resource.attributes["agent_name"], "grok-build") where IsMatch(resource.attributes["service.name"], "(?i)grok")
+          - set(resource.attributes["agent_name"], "codex") where IsMatch(resource.attributes["service.name"], "(?i)codex")
+          - set(resource.attributes["agent_name"], "gemini-cli") where IsMatch(resource.attributes["service.name"], "(?i)gemini")
+          - set(resource.attributes["agent_name"], "qwen-code") where IsMatch(resource.attributes["service.name"], "(?i)qwen")
+    log_statements: *agent_statements
+    trace_statements: *agent_statements
+  # Normalizes each CLI's event schema into common ai_* log attributes so the
+  # dashboard can treat every agent the same way. Source schemas:
+  #   claude-code  event.name=api_request (input/output/cache_read/cache_creation_tokens), session.id
+  #   grok-build   event.name=grok_code.api_request (input/output/reasoning/cache_read_tokens), session.id
+  #   codex        event.name=codex.sse_event (input_token_count incl. cached, cached_token_count), conversation.id
+  #   gemini/qwen  event.name=gemini_cli.api_response (input_token_count incl. cached, cached_content_token_count, thoughts_token_count)
+  transform/normalize:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # event name without vendor prefix: tool_result, api_request, user_prompt, ...
+          - set(log.attributes["ai_event"], log.attributes["event.name"]) where log.attributes["event.name"] != nil
+          - replace_pattern(log.attributes["ai_event"], "^(codex|gemini_cli|grok_code|qwen-code|qwen_code|claude_code)\\.", "") where log.attributes["ai_event"] != nil
+          # one session key for every agent
+          - set(log.attributes["ai_session_id"], log.attributes["session.id"]) where log.attributes["session.id"] != nil
+          - set(log.attributes["ai_session_id"], log.attributes["conversation.id"]) where log.attributes["ai_session_id"] == nil and log.attributes["conversation.id"] != nil
+          - set(log.attributes["ai_session_id"], log.attributes["conversation_id"]) where log.attributes["ai_session_id"] == nil and log.attributes["conversation_id"] != nil
+
+          # ---- tokens: ai_tokens_{input,output,cache_read,cache_write,total}; input excludes cache hits
+          # Claude Code / Grok Build (disjoint counters; Grok reasoning folded into output)
+          - set(log.attributes["ai_tokens_input"], Int(log.attributes["input_tokens"])) where log.attributes["ai_event"] == "api_request" and log.attributes["input_tokens"] != nil
+          - set(log.attributes["ai_tokens_output"], Int(log.attributes["output_tokens"])) where log.attributes["ai_event"] == "api_request" and log.attributes["output_tokens"] != nil
+          - set(log.attributes["ai_tokens_output"], log.attributes["ai_tokens_output"] + Int(log.attributes["reasoning_tokens"])) where log.attributes["ai_tokens_output"] != nil and log.attributes["reasoning_tokens"] != nil
+          - set(log.attributes["ai_tokens_cache_read"], Int(log.attributes["cache_read_tokens"])) where log.attributes["ai_event"] == "api_request" and log.attributes["cache_read_tokens"] != nil
+          - set(log.attributes["ai_tokens_cache_write"], Int(log.attributes["cache_creation_tokens"])) where log.attributes["ai_event"] == "api_request" and log.attributes["cache_creation_tokens"] != nil
+          # Codex / Gemini CLI / Qwen Code (*_token_count; input includes cached tokens)
+          - set(log.attributes["ai_tokens_input"], Int(log.attributes["input_token_count"])) where log.attributes["input_token_count"] != nil and log.attributes["ai_tokens_input"] == nil
+          - set(log.attributes["ai_tokens_output"], Int(log.attributes["output_token_count"])) where log.attributes["output_token_count"] != nil and log.attributes["ai_tokens_output"] == nil
+          - set(log.attributes["ai_tokens_output"], log.attributes["ai_tokens_output"] + Int(log.attributes["thoughts_token_count"])) where log.attributes["thoughts_token_count"] != nil and log.attributes["ai_tokens_output"] != nil
+          - set(log.attributes["ai_tokens_cache_read"], Int(log.attributes["cached_token_count"])) where log.attributes["cached_token_count"] != nil
+          - set(log.attributes["ai_tokens_cache_read"], Int(log.attributes["cached_content_token_count"])) where log.attributes["cached_content_token_count"] != nil
+          - set(log.attributes["ai_tokens_cache_write"], Int(log.attributes["cache_write_token_count"])) where log.attributes["cache_write_token_count"] != nil
+          - set(log.attributes["ai_tokens_input"], log.attributes["ai_tokens_input"] - log.attributes["ai_tokens_cache_read"]) where log.attributes["input_token_count"] != nil and log.attributes["ai_tokens_cache_read"] != nil
+          # fill gaps, then total
+          - set(log.attributes["ai_tokens_output"], 0) where log.attributes["ai_tokens_input"] != nil and log.attributes["ai_tokens_output"] == nil
+          - set(log.attributes["ai_tokens_cache_read"], 0) where log.attributes["ai_tokens_input"] != nil and log.attributes["ai_tokens_cache_read"] == nil
+          - set(log.attributes["ai_tokens_cache_write"], 0) where log.attributes["ai_tokens_input"] != nil and log.attributes["ai_tokens_cache_write"] == nil
+          - set(log.attributes["ai_tokens_total"], log.attributes["ai_tokens_input"] + log.attributes["ai_tokens_output"] + log.attributes["ai_tokens_cache_read"] + log.attributes["ai_tokens_cache_write"]) where log.attributes["ai_tokens_input"] != nil
+          - set(log.attributes["ai_cost_usd"], Double(log.attributes["cost_usd"])) where log.attributes["cost_usd"] != nil
+
+          # ---- tools / commands
+          - set(log.attributes["ai_tool"], log.attributes["tool_name"]) where log.attributes["tool_name"] != nil
+          - set(log.attributes["ai_tool"], log.attributes["function_name"]) where log.attributes["ai_tool"] == nil and log.attributes["function_name"] != nil
+          - set(log.attributes["ai_detail"], log.attributes["tool_parameters"]) where log.attributes["tool_parameters"] != nil
+          - set(log.attributes["ai_detail"], log.attributes["arguments"]) where log.attributes["ai_detail"] == nil and log.attributes["arguments"] != nil
+          - set(log.attributes["ai_detail"], log.attributes["function_args"]) where log.attributes["ai_detail"] == nil and log.attributes["function_args"] != nil
+          - set(log.attributes["ai_command"], ParseJSON(log.attributes["tool_parameters"])["full_command"]) where log.attributes["tool_name"] == "Bash" and log.attributes["tool_parameters"] != nil
+          - set(log.attributes["ai_command"], ParseJSON(log.attributes["arguments"])["cmd"]) where log.attributes["arguments"] != nil and IsMatch(log.attributes["arguments"], "^\\s*\\{")
+          - set(log.attributes["ai_command"], ParseJSON(log.attributes["function_args"])["command"]) where log.attributes["function_name"] == "run_shell_command" and log.attributes["function_args"] != nil
+          - set(log.attributes["ai_prompt"], log.attributes["prompt"]) where log.attributes["prompt"] != nil
+  # Prometheus only promotes a fixed list of resource attributes to labels,
+  # so copy agent_name onto each datapoint as well.
+  transform/agent_label:
+    error_mode: ignore
+    metric_statements:
+      - context: datapoint
+        statements:
+          - set(datapoint.attributes["agent_name"], resource.attributes["agent_name"])
+
+exporters:
+  otlp_http/metrics:
+    endpoint: http://127.0.0.1:9090/api/v1/otlp
+    tls:
+      insecure: true
+  otlp_http/traces:
+    endpoint: http://127.0.0.1:4418
+    tls:
+      insecure: true
+  otlp_http/logs:
+    endpoint: http://127.0.0.1:3100/otlp
+    tls:
+      insecure: true
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transform/agent, batch]
+      exporters: [otlp_http/traces]
+    metrics:
+      receivers: [otlp]
+      processors: [transform/agent, transform/agent_label, deltatocumulative, batch]
+      exporters: [otlp_http/metrics]
+    logs:
+      receivers: [otlp]
+      processors: [transform/agent, transform/normalize, batch]
+      exporters: [otlp_http/logs]

@@ -1,0 +1,1681 @@
+{
+  "uid": "ai-agents",
+  "title": "AI Agents Observability",
+  "description": "Sessions, tokens, time and live activity across Claude Code, Codex, Grok Build, Gemini CLI and Qwen Code.",
+  "tags": [
+    "ai",
+    "agents",
+    "opentelemetry"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "agent",
+        "label": "Agent",
+        "type": "custom",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "query": "claude-code,codex,gemini-cli,grok-build,qwen-code",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
+        "name": "session",
+        "label": "Session id (prefix)",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [
+    {
+      "title": "Explore logs",
+      "type": "link",
+      "url": "/explore",
+      "icon": "compass"
+    }
+  ],
+  "panels": [
+    {
+      "type": "row",
+      "title": "Overview (selected time range)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "id": 100,
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Sessions",
+      "description": "Distinct agent sessions (Codex: conversations) that emitted any event.",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "count(sum by (ai_session_id) (count_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_session_id!=\"\" [$__range])))",
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Tokens",
+      "description": "All tokens processed: input + output (incl. reasoning) + cache reads + cache writes.",
+      "gridPos": {
+        "x": 4,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(sum_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_tokens_total!=\"\" | unwrap ai_tokens_total [$__range]))",
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Model calls",
+      "description": "LLM API responses that reported token usage.",
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_tokens_total!=\"\" [$__range]))",
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Prompts",
+      "description": "User prompts submitted.",
+      "gridPos": {
+        "x": 11,
+        "y": 1,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_event=\"user_prompt\" [$__range]))",
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Tool calls",
+      "description": "Tool executions (shell, file edits, MCP, ...).",
+      "gridPos": {
+        "x": 14,
+        "y": 1,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_event=~\"tool_result|tool_call\" [$__range]))",
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Agent wall time",
+      "description": "Sum over sessions of (last event \u2212 first event).",
+      "gridPos": {
+        "x": 17,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(max_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_session_id!=\"\" | label_format ts=`{{ unixEpochMillis __timestamp__ }}` | unwrap ts [$__range]) by (ai_session_id) - min_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_session_id!=\"\" | label_format ts=`{{ unixEpochMillis __timestamp__ }}` | unwrap ts [$__range]) by (ai_session_id))",
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Cost (USD, Claude)",
+      "description": "Only Claude Code reports cost; other agents report tokens only.",
+      "gridPos": {
+        "x": 21,
+        "y": 1,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(sum_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_cost_usd!=\"\" | unwrap ai_cost_usd [$__range]))",
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "noValue": "0",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Tokens by agent",
+      "description": "Tokens processed per interval, stacked by agent.",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (agent_name) (sum_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_tokens_total!=\"\" | unwrap ai_tokens_total [$__interval]))",
+          "queryType": "range",
+          "legendFormat": "{{agent_name}}"
+        }
+      ],
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 85,
+            "barAlignment": 0,
+            "stacking": {
+              "mode": "normal"
+            },
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": false,
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "claude-code"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3987e5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "codex"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d95926"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "gemini-cli"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#199e70"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "grok-build"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#c98500"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "qwen-code"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d55181"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Tokens by type",
+      "description": "Normalized across agents; input excludes cache hits.",
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(sum_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_tokens_total!=\"\" | unwrap ai_tokens_input [$__interval]))",
+          "queryType": "range",
+          "legendFormat": "input (uncached)"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(sum_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_tokens_total!=\"\" | unwrap ai_tokens_output [$__interval]))",
+          "queryType": "range",
+          "legendFormat": "output + reasoning"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(sum_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_tokens_total!=\"\" | unwrap ai_tokens_cache_read [$__interval]))",
+          "queryType": "range",
+          "legendFormat": "cache read"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(sum_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_tokens_total!=\"\" | unwrap ai_tokens_cache_write [$__interval]))",
+          "queryType": "range",
+          "legendFormat": "cache write"
+        }
+      ],
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 85,
+            "barAlignment": 0,
+            "stacking": {
+              "mode": "normal"
+            },
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": false,
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "claude-code"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3987e5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "codex"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d95926"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "gemini-cli"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#199e70"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "grok-build"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#c98500"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "qwen-code"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d55181"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Sessions",
+      "description": "One row per session. Click a session id to filter the whole dashboard to it.",
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "min_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_session_id!=\"\" | label_format ts=`{{ unixEpochMillis __timestamp__ }}` | unwrap ts [$__range]) by (agent_name, ai_session_id)",
+          "queryType": "instant",
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "max_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_session_id!=\"\" | label_format ts=`{{ unixEpochMillis __timestamp__ }}` | unwrap ts [$__range]) by (agent_name, ai_session_id) - min_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_session_id!=\"\" | label_format ts=`{{ unixEpochMillis __timestamp__ }}` | unwrap ts [$__range]) by (agent_name, ai_session_id)",
+          "queryType": "instant",
+          "format": "table"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (agent_name, ai_session_id) (count_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_event=\"user_prompt\" [$__range]))",
+          "queryType": "instant",
+          "format": "table"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (agent_name, ai_session_id) (count_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_event=~\"tool_result|tool_call\" [$__range]))",
+          "queryType": "instant",
+          "format": "table"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (agent_name, ai_session_id) (count_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_tokens_total!=\"\" [$__range]))",
+          "queryType": "instant",
+          "format": "table"
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (agent_name, ai_session_id) (sum_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_tokens_total!=\"\" | unwrap ai_tokens_total [$__range]))",
+          "queryType": "instant",
+          "format": "table"
+        },
+        {
+          "refId": "G",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (agent_name, ai_session_id) (sum_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_cost_usd!=\"\" | unwrap ai_cost_usd [$__range]))",
+          "queryType": "instant",
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "Started",
+              "Value #B": "Duration",
+              "Value #C": "Prompts",
+              "Value #D": "Tool calls",
+              "Value #E": "Model calls",
+              "Value #F": "Tokens",
+              "Value #G": "Cost (USD)",
+              "agent_name": "Agent",
+              "ai_session_id": "Session"
+            },
+            "indexByName": {
+              "agent_name": 0,
+              "ai_session_id": 1,
+              "Value #A": 2,
+              "Value #B": 3,
+              "Value #C": 4,
+              "Value #D": 5,
+              "Value #E": 6,
+              "Value #F": 7,
+              "Value #G": 8
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Started",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          },
+          "noValue": "\u2013"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Started"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duration"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic",
+                  "valueDisplayMode": "text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3987e5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Session"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 285
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Filter dashboard to this session",
+                    "url": "/d/ai-agents/ai-agents-observability?${__url_time_range}&var-agent=${agent}&var-session=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "logs",
+      "title": "Live activity \u2014 what the agents are doing",
+      "description": "Prompts, tool calls / shell commands, model calls and responses from every agent, newest first. Columns: agent \u2502 session \u2502 event \u2502 detail.",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 13
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_event=~\"user_prompt|tool_result|tool_call|tool_decision|api_request|api_response|api_error|assistant_response|session_start|session_end|conversation_starts|subagent|compaction|sse_event\" | ai_event!~\"sse_event|api_request|api_response\" or ai_tokens_total!=\"\" | line_format `{{ alignLeft 11 .agent_name }} \u2502 {{ alignLeft 8 (trunc 8 .ai_session_id) }} \u2502 {{ alignLeft 18 .ai_event }} \u2502 {{ if .ai_command }}$ {{ .ai_command }}{{ if .decision }}  [{{ .decision }}]{{ end }}{{ if .duration_ms }}  ({{ .duration_ms }} ms){{ end }}{{ else if .ai_tool }}{{ .ai_tool }} {{ trunc 240 .ai_detail }}{{ if .decision }}  [{{ .decision }}]{{ end }}{{ else if .ai_prompt }}\u00bb {{ trunc 400 .ai_prompt }}{{ else if .ai_tokens_total }}{{ .model }} \u00b7 {{ .ai_tokens_total }} tokens{{ if .duration_ms }} \u00b7 {{ .duration_ms }} ms{{ end }}{{ if .ai_cost_usd }} \u00b7 ${{ .ai_cost_usd }}{{ end }}{{ else if .response }}\u00ab {{ trunc 300 .response }}{{ else }}{{ .model }}{{ end }}`",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Shell commands executed",
+      "description": "Every shell command an agent ran (Grok Build never exports command text by design).",
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 15,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_event=~\"tool_result|tool_call\" | ai_command!=\"\" | line_format `{{ .ai_command }}`",
+          "queryType": "range"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "labels",
+            "format": "auto",
+            "replace": false,
+            "keepTime": false
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "includeByName": {
+              "Time": true,
+              "agent_name": true,
+              "ai_session_id": true,
+              "Line": true,
+              "success": true,
+              "duration_ms": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "agent_name": 1,
+              "Line": 2,
+              "success": 3,
+              "duration_ms": 4,
+              "ai_session_id": 5
+            },
+            "renameByName": {
+              "agent_name": "Agent",
+              "Line": "Command",
+              "success": "OK",
+              "duration_ms": "ms",
+              "ai_session_id": "Session"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "\u2013"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Agent"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OK"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ms"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Session"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Time",
+            "desc": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "type": "barchart",
+      "title": "Tool usage",
+      "description": "Tool calls in the selected range, per agent and tool.",
+      "gridPos": {
+        "x": 15,
+        "y": 35,
+        "w": 9,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (agent_name, ai_tool) (count_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_event=~\"tool_result|tool_call\" [$__range]))",
+          "queryType": "instant",
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "agent_name",
+            "rowField": "ai_tool",
+            "valueField": "Value #A",
+            "emptyValue": "zero"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 90,
+            "lineWidth": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "claude-code"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3987e5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "codex"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d95926"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "gemini-cli"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#199e70"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "grok-build"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#c98500"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "qwen-code"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d55181"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "stacking": "normal",
+        "showValue": "never",
+        "barRadius": 0.1,
+        "groupWidth": 0.7,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "xTickLabelMaxLength": 24
+      }
+    },
+    {
+      "id": 14,
+      "type": "bargauge",
+      "title": "Tokens per agent",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (agent_name) (sum_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_tokens_total!=\"\" | unwrap ai_tokens_total [$__range]))",
+          "queryType": "instant",
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "displayName": "${__field.labels.agent_name}",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#3987e5"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "text",
+        "namePlacement": "top",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 16
+        },
+        "minVizHeight": 18,
+        "maxVizHeight": 28,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": true,
+          "fields": "/^Value/"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Model call latency (avg)",
+      "description": "Average duration of model calls that report latency (Claude Code, Grok Build, Gemini CLI).",
+      "gridPos": {
+        "x": 8,
+        "y": 45,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "avg by (agent_name) (avg_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_tokens_total!=\"\" | duration_ms!=\"\" | unwrap duration_ms [$__interval]))",
+          "queryType": "range",
+          "legendFormat": "{{agent_name}}"
+        }
+      ],
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "barAlignment": 0,
+            "stacking": {
+              "mode": "none"
+            },
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": false,
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "claude-code"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3987e5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "codex"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d95926"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "gemini-cli"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#199e70"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "grok-build"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#c98500"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "qwen-code"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d55181"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Tool calls over time",
+      "description": "",
+      "gridPos": {
+        "x": 16,
+        "y": 45,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (agent_name) (count_over_time({service_name=~\".+\"} | agent_name=~\"$agent\" | ai_session_id=~\"${session}.*\" | ai_event=~\"tool_result|tool_call\" [$__interval]))",
+          "queryType": "range",
+          "legendFormat": "{{agent_name}}"
+        }
+      ],
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 85,
+            "barAlignment": 0,
+            "stacking": {
+              "mode": "normal"
+            },
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": false,
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "claude-code"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3987e5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "codex"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d95926"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "gemini-cli"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#199e70"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "grok-build"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#c98500"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "qwen-code"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d55181"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "table",
+      "title": "Recent traces (Claude Code & Codex emit spans)",
+      "description": "Click a trace id to open the span waterfall: interaction \u2192 model call \u2192 tool execution.",
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "limit": 30,
+          "tableType": "traces",
+          "query": "{resource.agent_name=~\"${agent:regex}\"}"
+        }
+      ]
+    }
+  ]
+}

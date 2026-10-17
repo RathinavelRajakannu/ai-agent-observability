@@ -1,0 +1,10 @@
+apiVersion: 1
+
+providers:
+  - name: "AI Agents"
+    folder: "AI Agents"
+    type: file
+    allowUiUpdates: true
+    options:
+      path: /otel-lgtm/ai-dashboards
+      foldersFromFilesStructure: false

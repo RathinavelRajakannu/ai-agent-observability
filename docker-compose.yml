@@ -1,0 +1,30 @@
+# AI agent observability stack: OTel Collector + Prometheus + Loki + Tempo + Grafana
+# in one container (grafana/otel-lgtm). All ports bind to 127.0.0.1 only —
+# Grafana runs with anonymous admin access, so it must never be exposed.
+name: ai-observability
+
+services:
+  lgtm:
+    image: grafana/otel-lgtm:0.35.0
+    container_name: ai-observability
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3300:3000"   # Grafana UI (3000 is taken by pyrohub on this machine)
+      - "127.0.0.1:4317:4317"   # OTLP gRPC
+      - "127.0.0.1:4318:4318"   # OTLP HTTP
+      - "127.0.0.1:9091:9090"   # Prometheus (debug/API access)
+      - "127.0.0.1:3101:3100"   # Loki (debug/API access)
+    environment:
+      # Inject a zero sample at each OTLP series' start time so increase() counts
+      # the first value of short-lived per-session series.
+      PROMETHEUS_EXTRA_ARGS: "--enable-feature=created-timestamp-zero-ingestion,promql-extended-range-selectors --storage.tsdb.retention.time=180d"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/ai-dashboards/ai-agents.json
+    volumes:
+      - lgtm-data:/data
+      # Adds delta->cumulative conversion (Claude Code & Grok export delta counters)
+      - ./otel/otelcol-config.yaml:/otel-lgtm/otelcol-config.yaml:ro
+      - ./grafana/provisioning/ai-agents.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/ai-agents.yaml:ro
+      - ./grafana/dashboards:/otel-lgtm/ai-dashboards:ro
+
+volumes:
+  lgtm-data:
